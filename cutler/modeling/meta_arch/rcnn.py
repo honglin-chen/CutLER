@@ -10,7 +10,7 @@ from torch import nn
 from detectron2.config import configurable
 from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.layers import move_device_like
-from detectron2.structures import ImageList, Instances
+from detectron2.structures import ImageList, Instances, BoxMode
 from detectron2.utils.events import get_event_storage
 from detectron2.utils.logger import log_first_n
 
@@ -19,6 +19,12 @@ from detectron2.modeling.postprocessing import detector_postprocess
 from detectron2.modeling.proposal_generator import build_proposal_generator
 from ..roi_heads import build_roi_heads
 from .build import META_ARCH_REGISTRY
+from .bbnet_teacher import EvalBBNet
+import torch.nn.functional as F
+from torchvision.ops import masks_to_boxes
+from data import detection_utils as utils
+from detectron2.utils.visualizer import Visualizer
+
 
 __all__ = ["GeneralizedRCNN", "ProposalNetwork"]
 
@@ -43,6 +49,7 @@ class GeneralizedRCNN(nn.Module):
         pixel_std: Tuple[float],
         input_format: Optional[str] = None,
         vis_period: int = 0,
+        bbnet_teacher: Optional[float] = False,
     ):
         """
         Args:
@@ -58,6 +65,7 @@ class GeneralizedRCNN(nn.Module):
         self.backbone = backbone
         self.proposal_generator = proposal_generator
         self.roi_heads = roi_heads
+        self.bbnet_teacher = bbnet_teacher
 
         self.input_format = input_format
         self.vis_period = vis_period
@@ -70,6 +78,12 @@ class GeneralizedRCNN(nn.Module):
             self.pixel_mean.shape == self.pixel_std.shape
         ), f"{self.pixel_mean} and {self.pixel_std} have different shapes!"
 
+        if self.bbnet_teacher:
+            self.teacher_model = EvalBBNet(distributed=False, rank=0,
+                                           type='bbnet_iter_binary', pos_threshold=0.75, neg_threshold=0.25)
+
+        self.zero_loss = None
+
     @classmethod
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
@@ -81,6 +95,7 @@ class GeneralizedRCNN(nn.Module):
             "vis_period": cfg.VIS_PERIOD,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
+            "bbnet_teacher": cfg.MODEL.BBNET_TEACHER
         }
 
     @property
@@ -152,7 +167,54 @@ class GeneralizedRCNN(nn.Module):
             return self.inference(batched_inputs)
 
         images = self.preprocess_image(batched_inputs)
-        if "instances" in batched_inputs[0]:
+
+        if self.bbnet_teacher: # generate teacher segments on the fly
+            device = images.tensor.device
+            B, _, H, W = images.tensor.shape
+            teacher_x = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
+            teacher_x = F.interpolate(teacher_x, size=224, mode='bilinear').contiguous()
+
+            save_path = None
+            # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test_1/teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
+
+            _, segment_target = self.teacher_model(teacher_x, teacher_x, save_path=save_path)
+
+            segment_target = F.interpolate(segment_target, size=[H,W], mode='bilinear') > 0.5
+            segment_target = segment_target.float()
+
+            gt_instances = []
+            new_batched_inputs = []
+            for i in range(B):
+                if segment_target[i].sum() == 0:
+                    print('Ignore image with no segment')
+                    continue
+                new_batched_inputs.append(batched_inputs[i])
+                annotations = dict()
+                annotations['bbox'] = masks_to_boxes(segment_target[i]).cpu()[0]
+                annotations['bbox_mode'] = BoxMode.XYXY_ABS
+                annotations['segmentation'] = segment_target[i, 0].cpu().detach().numpy()
+                annotations['category_id'] = torch.tensor(0)
+                instances = utils.annotations_to_instances([annotations], image_size=[H, W], mask_format='bitmask')
+                gt_instances.append(instances.to(device))
+
+                # original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
+                # visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
+                #
+                # vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
+                #
+                # print("Saving to {} ...".format(save_path))
+                # vis.save(save_path.replace('bbnet_teacher_test_1', 'bbnet_teacher_test'))
+
+
+            batched_inputs = new_batched_inputs
+            if len(batched_inputs) == 0:
+                return {k: images.tensor.sum() * 0. for k in self.zero_loss.keys()}
+
+            images = self.preprocess_image(batched_inputs)
+
+
+
+        elif "instances" in batched_inputs[0]:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
@@ -175,6 +237,10 @@ class GeneralizedRCNN(nn.Module):
         losses = {}
         losses.update(detector_losses)
         losses.update(proposal_losses)
+
+        if self.zero_loss is None:
+            self.zero_loss = {k: torch.tensor(0.).to(self.device) for k in losses.keys()}
+
         return losses
 
     def inference(

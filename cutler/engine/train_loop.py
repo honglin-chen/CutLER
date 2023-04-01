@@ -252,7 +252,7 @@ class CustomSimpleTrainer(SimpleTrainer):
         data = next(self._data_loader_iter)
         # print(data, len(data))
         if self.use_copy_paste:
-            # print('using copy paste')
+            print('using copy paste')
             data = self.copy_and_paste(copy.deepcopy(data[::-1]), data)
         data_time = time.perf_counter() - start
 
@@ -327,7 +327,7 @@ class CustomAMPTrainer(CustomSimpleTrainer):
         start = time.perf_counter()
         data = next(self._data_loader_iter)
         if self.use_copy_paste:
-            # print('using copy paste')
+            print('using copy paste')
             data = self.copy_and_paste(copy.deepcopy(data[::-1]), data)
         data_time = time.perf_counter() - start
 

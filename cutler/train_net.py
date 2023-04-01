@@ -45,6 +45,9 @@ from detectron2.modeling import GeneralizedRCNNWithTTA
 import data # register new datasets
 import modeling.roi_heads
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def build_evaluator(cfg, dataset_name, output_folder=None):
     """
     Create evaluator(s) for a given dataset.

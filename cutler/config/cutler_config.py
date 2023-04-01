@@ -12,6 +12,7 @@ def add_cutler_config(cfg):
 
     cfg.MODEL.ROI_HEADS.USE_DROPLOSS = False
     cfg.MODEL.ROI_HEADS.DROPLOSS_IOU_THRESH = 0.0
+    cfg.MODEL.BBNET_TEACHER = False
 
     cfg.SOLVER.BASE_LR_MULTIPLIER = 1
     cfg.SOLVER.BASE_LR_MULTIPLIER_NAMES = []
