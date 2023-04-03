@@ -51,23 +51,22 @@ class EvalBBNet(nn.Module):
             self.decorator = torch.cuda.amp.autocast()
 
             iteration_teacher = iteration_head_motion_eisen_teacher_fa()#.to(rank)
-            num_raft_iters = 12
+            num_raft_iters = 6
             iteration_teacher.set_raft_iters(num_raft_iters)
 
             if distributed:
                 iteration_teacher.dummy_parameter = torch.nn.Parameter(torch.tensor(1.0).to(rank), requires_grad=True)
                 self.iteration_teacher = DDP(iteration_teacher, device_ids=[rank], output_device=rank, find_unused_parameters=False)
             else:
-                self.iteration_teacher = iteration_teacher # .cuda()
-
+                self.iteration_teacher = iteration_teacher.eval() # .cuda()
 
 
     def forward(self, image_1, image_2, ts=None, pos_threshold=0.9, neg_threshold=0.1, save_path=None, num_init_points=None, gt_segment=None):
         B, _, H, W = image_1.shape
 
         # Input should have value in range 【0, 255】.
-        x = torch.cat([image_1.unsqueeze(1), image_2.unsqueeze(1)], dim=1).contiguous() / 255.
-        ts = None # self.ts.expand(B, -1).to(x) if ts is None else ts
+        x = torch.cat([image_1.unsqueeze(1), image_2.unsqueeze(1)], dim=1) / 255.
+        ts = self.ts.expand(B, -1).to(x) if ts is None else ts
         # assert x.min() >= 0. and x.max() <= 1.0, (x.min(), x.max())
         target_points = None
 

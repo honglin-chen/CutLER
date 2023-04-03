@@ -21,7 +21,7 @@ You may want to write your own script with your datasets and other customization
 import logging
 import os
 from collections import OrderedDict
-
+import random
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -167,8 +167,8 @@ if __name__ == "__main__":
     args = default_argument_parser().parse_args()
     # print(args)
     # args.opts = postprocess_args(args.opts)
-    # rint = random.randint(0, 10000)
-    # args.dist_url = args.dist_url.replace('12399', str(12399 + rint))
+    rint = random.randint(0, 10000)
+    args.dist_url = args.dist_url.replace('50153', str(50153 + rint))
     print("Command Line Args:", args)
     launch(
         main,
