@@ -49,7 +49,8 @@ class GeneralizedRCNN(nn.Module):
         pixel_std: Tuple[float],
         input_format: Optional[str] = None,
         vis_period: int = 0,
-        bbnet_teacher: Optional[float] = False,
+        bbnet_teacher: Optional[bool] = False,
+        single_mask: Optional[bool] = False,
     ):
         """
         Args:
@@ -66,6 +67,7 @@ class GeneralizedRCNN(nn.Module):
         self.proposal_generator = proposal_generator
         self.roi_heads = roi_heads
         self.bbnet_teacher = bbnet_teacher
+        self.single_mask = single_mask
 
         self.input_format = input_format
         self.vis_period = vis_period
@@ -95,7 +97,8 @@ class GeneralizedRCNN(nn.Module):
             "vis_period": cfg.VIS_PERIOD,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
-            "bbnet_teacher": cfg.MODEL.BBNET_TEACHER
+            "bbnet_teacher": cfg.MODEL.BBNET_TEACHER,
+            "single_mask": cfg.MODEL.SINGLE_MASK,
         }
 
     @property
@@ -174,8 +177,8 @@ class GeneralizedRCNN(nn.Module):
             teacher_x = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
             teacher_x = F.interpolate(teacher_x, size=224, mode='bilinear')# .contiguous()
 
-            save_path = None
-            # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test_1/teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
+            # save_path = None
+            save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test_1/teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
 
             with torch.no_grad():
                 _, segment_target = self.teacher_model(teacher_x, teacher_x, save_path=save_path)
@@ -195,18 +198,22 @@ class GeneralizedRCNN(nn.Module):
                     annotations['category_id'] = torch.tensor(0)
                     instances = utils.annotations_to_instances([annotations], image_size=[H, W], mask_format='bitmask')
                 gt_instances.append(instances.to(device))
-                # original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
-                # visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
-                #
-                # vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
-                #
-                # print("Saving to {} ...".format(save_path))
-                # vis.save(save_path.replace('bbnet_teacher_test_1', 'bbnet_teacher_test'))
+                original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
+                visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
+
+                vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
+
+                print("Saving to {} ...".format(save_path))
+                vis.save(save_path.replace('bbnet_teacher_test_1', 'bbnet_teacher_test'))
 
 
 
         elif "instances" in batched_inputs[0]:
-            gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
+
+            if self.single_mask:
+                gt_instances = [x["instances"][0:1].to(self.device) for x in batched_inputs]
+            else:
+                gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
 
