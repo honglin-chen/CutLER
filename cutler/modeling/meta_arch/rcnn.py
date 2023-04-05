@@ -174,38 +174,54 @@ class GeneralizedRCNN(nn.Module):
         if self.bbnet_teacher: # generate teacher segments on the fly
             device = images.tensor.device
             B, _, H, W = images.tensor.shape
-            teacher_x = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
-            teacher_x = F.interpolate(teacher_x, size=224, mode='bilinear')# .contiguous()
+            teacher_x = []
 
-            # save_path = None
-            save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test_1/teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
+            for x in batched_inputs:
+                image = F.interpolate(x['image'].float().to(device).unsqueeze(0), size=224, mode='bilinear')
+                teacher_x.append(image)
+            teacher_x = torch.cat(teacher_x, dim=0)
+
+            save_path = None
+            # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test_1/teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
 
             with torch.no_grad():
-                _, segment_target = self.teacher_model(teacher_x, teacher_x, save_path=save_path)
-
-            segment_target = F.interpolate(segment_target, size=[H,W], mode='bilinear') > 0.5
-            segment_target = segment_target.float()
+                _, segment_target = self.teacher_model(teacher_x, teacher_x, save_path=save_path) # [B, 1, 224, 224]
 
             gt_instances = []
+            segment_list = []
             for i in range(B):
-                if segment_target[i].sum() == 0:
+                size = batched_inputs[i]['image'].shape[-2:]
+                segment = F.interpolate(segment_target[i:i+1], size=size, mode='bilinear') > 0.5
+                segment = segment.float()
+                segment_list.append(segment[0])
+
+            segments = ImageList.from_tensors(
+                segment_list,
+                self.backbone.size_divisibility,
+                padding_constraints=self.backbone.padding_constraints,
+            )
+
+            for i in range(B):
+                segment = segments.tensor[i]
+                if segment.sum() == 0:
                     instances = utils.annotations_to_instances([], image_size=[H, W], mask_format='bitmask')
                 else:
                     annotations = dict()
-                    annotations['bbox'] = masks_to_boxes(segment_target[i]).cpu()[0]
+                    annotations['bbox'] = masks_to_boxes(segment).cpu()[0]
                     annotations['bbox_mode'] = BoxMode.XYXY_ABS
-                    annotations['segmentation'] = segment_target[i, 0].cpu().detach().numpy()
+                    annotations['segmentation'] = segment[0].cpu().detach().numpy()
                     annotations['category_id'] = torch.tensor(0)
                     instances = utils.annotations_to_instances([annotations], image_size=[H, W], mask_format='bitmask')
+
+                    # # Visualization
+                    # original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
+                    # visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
+                    # vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
+                    # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test/teacher/{batched_inputs[i]['file_name'].split('/')[-1]}"
+                    # print("Saving to {} ...".format(save_path))
+                    # vis.save(save_path)
+
                 gt_instances.append(instances.to(device))
-                original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
-                visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
-
-                vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
-
-                print("Saving to {} ...".format(save_path))
-                vis.save(save_path.replace('bbnet_teacher_test_1', 'bbnet_teacher_test'))
-
 
 
         elif "instances" in batched_inputs[0]:
