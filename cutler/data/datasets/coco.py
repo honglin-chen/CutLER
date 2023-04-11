@@ -155,7 +155,7 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
 
     num_instances_without_valid_segmentation = 0
 
-    # print('Warning: This function is not tested yet.')
+    # print('Warning: remove this line')
     # imgs_anns = imgs_anns[100:200]
 
     for (img_dict, anno_dict_list) in imgs_anns:

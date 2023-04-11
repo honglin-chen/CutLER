@@ -24,6 +24,7 @@ import torch.nn.functional as F
 from torchvision.ops import masks_to_boxes
 from data import detection_utils as utils
 from detectron2.utils.visualizer import Visualizer
+from detectron2.structures import BitMasks
 
 
 __all__ = ["GeneralizedRCNN", "ProposalNetwork"]
@@ -51,6 +52,7 @@ class GeneralizedRCNN(nn.Module):
         vis_period: int = 0,
         bbnet_teacher: Optional[bool] = False,
         single_mask: Optional[bool] = False,
+        downsize_mask: Optional[bool] = False,
     ):
         """
         Args:
@@ -68,6 +70,7 @@ class GeneralizedRCNN(nn.Module):
         self.roi_heads = roi_heads
         self.bbnet_teacher = bbnet_teacher
         self.single_mask = single_mask
+        self.downsize_mask = downsize_mask
 
         self.input_format = input_format
         self.vis_period = vis_period
@@ -99,6 +102,7 @@ class GeneralizedRCNN(nn.Module):
             "pixel_std": cfg.MODEL.PIXEL_STD,
             "bbnet_teacher": cfg.MODEL.BBNET_TEACHER,
             "single_mask": cfg.MODEL.SINGLE_MASK,
+            "downsize_mask": cfg.MODEL.DOWNSIZE_MASK,
         }
 
     @property
@@ -228,6 +232,18 @@ class GeneralizedRCNN(nn.Module):
 
             if self.single_mask:
                 gt_instances = [x["instances"][0:1].to(self.device) for x in batched_inputs]
+
+                if self.downsize_mask:
+                    for i in range(len(gt_instances)):
+                        mask = gt_instances[i][0].gt_masks.tensor
+                        _, h, w = mask.shape
+                        mask = F.interpolate(mask.unsqueeze(0).float(), size=224, mode='bilinear')
+                        mask = F.interpolate(mask.float(), size=[h, w], mode='bilinear') > 0.5
+                        instance_clone = gt_instances[i][0]
+                        instance_clone.set('gt_masks', BitMasks(mask[0]))
+                        gt_instances[i] = instance_clone
+
+
             else:
                 gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         else:

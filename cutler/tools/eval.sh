@@ -3,7 +3,9 @@
 # link to the dataset folder, model weights and the config file.
 #model_weights="http://dl.fbaipublicfiles.com/cutler/checkpoints/cutler_cascade_final.pth"
 #model_weights='output/model_0004999.pth'
-model_weights='/ccn2/u/honglinc/cutler_checkpoints/cutler_single_mask/model_0009999.pth'
+#model_weights='/ccn2/u/honglinc/cutler_checkpoints/cutler_nocopypaste/model_0034999.pth'
+model_weights='/ccn2/u/honglinc/cutler_checkpoints/cutler_single_mask/model_0034999.pth'
+#model_weights='/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner/model_0014999.pth'
 config_file="model_zoo/configs/CutLER-ImageNet/cascade_mask_rcnn_R_50_FPN_no_copy_paste.yaml"
 
 #model_weights='/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_0/model_0004999.pth'
