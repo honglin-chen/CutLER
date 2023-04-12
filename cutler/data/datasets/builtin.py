@@ -40,6 +40,7 @@ _PREDEFINED_SPLITS_COCO_SEMI["coco_semi"] = {
 
 _PREDEFINED_SPLITS_COCO_CA = {}
 _PREDEFINED_SPLITS_COCO_CA["coco_cls_agnostic"] = {
+    "coco_train": ("coco/train2017", "coco/annotations/instances_train2017.json"),
     "cls_agnostic_coco": ("coco/val2017", "coco/annotations/coco_cls_agnostic_instances_val2017.json"),
     "cls_agnostic_coco20k": ("coco/train2014", "coco/annotations/coco20k_trainval_gt.json"),
 }

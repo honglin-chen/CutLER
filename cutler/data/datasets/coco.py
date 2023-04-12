@@ -80,7 +80,9 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
         # The categories in a custom json file may not be sorted.
         thing_classes = [c["name"] for c in sorted(cats, key=lambda x: x["id"])]
         if "imagenet" not in dataset_name and "cls_agnostic" not in dataset_name:
-            meta.thing_classes = thing_classes
+
+            if dataset_name is not "coco_train":
+                meta.thing_classes = thing_classes
 
             # In COCO, certain category ids are artificially removed,
             # and by convention they are always ignored.
@@ -97,8 +99,13 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
     Category ids in annotations are not in [1, #categories]! We'll apply a mapping for you.
     """
                     )
-            id_map = {v: i for i, v in enumerate(cat_ids)}
-            meta.thing_dataset_id_to_contiguous_id = id_map
+
+            if dataset_name is not "coco_train":
+                id_map = {v: i for i, v in enumerate(cat_ids)}
+                meta.thing_dataset_id_to_contiguous_id = id_map
+            else:
+                id_map = {v: 0 for i, v in enumerate(cat_ids)}
+
         else:
             id_map = meta.thing_dataset_id_to_contiguous_id
 

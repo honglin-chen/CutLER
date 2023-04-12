@@ -34,9 +34,9 @@ MODEL:
     NMS_THRESH: 0.65
   BBNET_TEACHER: True
 DATASETS:
-  TRAIN: ("imagenet_train",)
+  TRAIN: ("coco_train",)
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 8
   BASE_LR: 0.01
   WEIGHT_DECAY: 0.00005
   STEPS: (80000,)
@@ -59,4 +59,4 @@ TEST:
     ENABLED: True
     NUM_ITER: 200
   DETECTIONS_PER_IMAGE: 100
-OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_1corner/"
+OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner_coco/"

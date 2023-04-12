@@ -221,7 +221,7 @@ class GeneralizedRCNN(nn.Module):
                     # original_image = images.tensor * self.pixel_std[None] + self.pixel_mean[None]
                     # visualizer = Visualizer(original_image[i].permute(1, 2, 0).cpu().numpy(), metadata=None)
                     # vis = visualizer.overlay_instances(boxes=annotations['bbox'].unsqueeze(0),  masks=[annotations['segmentation']])
-                    # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_test/teacher/{batched_inputs[i]['file_name'].split('/')[-1]}"
+                    # save_path = f"/ccn2/u/honglinc/eisen_results_v2/bbnet_teacher_coco_test/{batched_inputs[i]['file_name'].split('/')[-1]}"
                     # print("Saving to {} ...".format(save_path))
                     # vis.save(save_path)
 
