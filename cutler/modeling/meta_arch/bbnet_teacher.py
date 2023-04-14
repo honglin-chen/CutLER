@@ -61,7 +61,7 @@ class EvalBBNet(nn.Module):
                 self.iteration_teacher = iteration_teacher.eval() # .cuda()
 
 
-    def forward(self, image_1, image_2, ts=None, pos_threshold=0.9, neg_threshold=0.1, save_path=None, num_init_points=None, gt_segment=None):
+    def forward(self, image_1, image_2, ts=None, pos_threshold=0.9, neg_threshold=0.1, save_path=None, num_init_points=None, gt_segment=None, init_dist=None):
         B, _, H, W = image_1.shape
 
         # Input should have value in range 【0, 255】.
@@ -92,7 +92,7 @@ class EvalBBNet(nn.Module):
             ## Iteration target
 
             with self.decorator:
-                targets, _, _ = self.iteration_teacher(x.to(torch.float16 if self.use_float16 else torch.float32), sample_batch_size=None)
+                targets, _, _ = self.iteration_teacher(x.to(torch.float16 if self.use_float16 else torch.float32), init_dist=init_dist, sample_batch_size=None)
             # targets, _, _ = self.iteration_teacher(x, timestamps=ts, sample_batch_size=10, num_target_points=1)
 
 
@@ -202,7 +202,7 @@ class EvalBBNet(nn.Module):
 
         targets > self.pos_threshold
 
-        return target_points, targets.detach()
+        return target_points, targets.detach(), self.iteration_teacher.sampling_distribution
 
 
 

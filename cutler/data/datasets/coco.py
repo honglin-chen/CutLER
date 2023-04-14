@@ -81,7 +81,7 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
         thing_classes = [c["name"] for c in sorted(cats, key=lambda x: x["id"])]
         if "imagenet" not in dataset_name and "cls_agnostic" not in dataset_name:
 
-            if dataset_name is not "coco_train":
+            if dataset_name != "coco_train":
                 meta.thing_classes = thing_classes
 
             # In COCO, certain category ids are artificially removed,
@@ -100,7 +100,7 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
     """
                     )
 
-            if dataset_name is not "coco_train":
+            if dataset_name != "coco_train":
                 id_map = {v: i for i, v in enumerate(cat_ids)}
                 meta.thing_dataset_id_to_contiguous_id = id_map
             else:
@@ -162,8 +162,8 @@ def load_coco_json(json_file, image_root, dataset_name=None, extra_annotation_ke
 
     num_instances_without_valid_segmentation = 0
 
-    # print('Warning: remove this line')
-    # imgs_anns = imgs_anns[100:200]
+    # print('!!!!! Warning: remove this line' * 100)
+    # imgs_anns = imgs_anns[0::1000]
 
     for (img_dict, anno_dict_list) in imgs_anns:
         record = {}

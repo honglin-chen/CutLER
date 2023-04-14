@@ -32,11 +32,11 @@ MODEL:
   RPN:
     POST_NMS_TOPK_TRAIN: 4000
     NMS_THRESH: 0.65
-  TEACHER_TYPE: "bbnet"
+  TEACHER_TYPE: "bbnet_init_dino"
 DATASETS:
-  TRAIN: ("coco_train",)
+  TRAIN: ("imagenet_train",)
 SOLVER:
-  IMS_PER_BATCH: 8
+  IMS_PER_BATCH: 16
   BASE_LR: 0.01
   WEIGHT_DECAY: 0.00005
   STEPS: (80000,)
@@ -59,4 +59,4 @@ TEST:
     ENABLED: True
     NUM_ITER: 200
   DETECTIONS_PER_IMAGE: 100
-OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner_coco/"
+OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner_init_dino/"
