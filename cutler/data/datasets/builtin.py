@@ -17,9 +17,13 @@ To add new dataset, refer to the tutorial "docs/DATASETS.md".
 """
 
 import os
-
+import sys
+sys.path.append('/home/honglinc/BBNet/bbnet/models/VideoMAE-main')
+import datasets as vmae_datasets
+import dataset_utils as vmae_data_utils
 from .builtin_meta import _get_builtin_metadata
 from .coco import register_coco_instances
+from .kinetics import register_kinetics_instances
 
 # ==== Predefined datasets and splits for COCO ==========
 
@@ -43,6 +47,11 @@ _PREDEFINED_SPLITS_COCO_CA["coco_cls_agnostic"] = {
     "coco_train": ("coco/train2017", "coco/annotations/instances_train2017.json"),
     "cls_agnostic_coco": ("coco/val2017", "coco/annotations/coco_cls_agnostic_instances_val2017.json"),
     "cls_agnostic_coco20k": ("coco/train2014", "coco/annotations/coco20k_trainval_gt.json"),
+}
+
+_PREDEFINED_SPLITS_KINETICS = {}
+_PREDEFINED_SPLITS_KINETICS["kinetics"] = {
+    "kinetics_train": ("/ccn2/u/datasets/kinetics", "/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt"),
 }
 
 _PREDEFINED_SPLITS_IMAGENET = {}
@@ -204,6 +213,12 @@ def register_all_coco_ca(root):
                 os.path.join(root, image_root),
             )
 
+def register_all_kinetics(root):
+    for dataset_name, splits_per_dataset in _PREDEFINED_SPLITS_KINETICS.items():
+        for key, (image_root, json_file) in splits_per_dataset.items():
+            # Assume pre-defined datasets live in `./datasets`.
+            register_kinetics_instances(key, image_root, json_file)
+
 _root = os.path.expanduser(os.getenv("DETECTRON2_DATASETS", "datasets"))
 register_all_coco_semi(_root)
 register_all_coco_ca(_root)
@@ -215,3 +230,4 @@ register_all_kitti(_root)
 register_all_openimages(_root)
 register_all_objects365(_root)
 register_all_lvis(_root)
+register_all_kinetics(_root)

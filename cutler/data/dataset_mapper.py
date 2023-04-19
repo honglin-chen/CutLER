@@ -151,6 +151,19 @@ class DatasetMapper:
         Returns:
             dict: a format that builtin models in detectron2 accept
         """
+
+        if 'video' in dataset_dict.keys():
+            images = dataset_dict['video']
+            images *= torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+            images += torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+            images *= 255
+            dataset_dict['image'] = images[0]
+            dataset_dict['video'] = images
+            h, w = images.shape[-2:]
+            dataset_dict['width'] = w
+            dataset_dict['height'] = h
+            return dataset_dict
+
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # USER: Write your own image loading if it's not from a file
         image = utils.read_image(dataset_dict["file_name"], format=self.image_format)

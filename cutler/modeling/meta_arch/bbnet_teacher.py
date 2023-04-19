@@ -1,7 +1,7 @@
 import sys
 sys.path.append('/home/honglinc/BBNet')
 from bbnet.models.teachers import default_head_motion_eisen_teacher, load_predictor, make_teacher, default_eisen_teacher_func, set_input_shape_parallel, default_model_dir, full_affinities_eisen_teacher_func, iteration_head_motion_eisen_teacher_fa
-
+import bbnet.models.teachers as teachers
 import torch.nn as nn
 import torch
 import os
@@ -20,7 +20,7 @@ class EvalBBNet(nn.Module):
         self.neg_threshold = neg_threshold
 
         self.type = type
-        assert type in ['bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all'], type
+        assert type in ['bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
 
         if type in ['bbnet_old', 'all']:
             phi_2frame = load_predictor(model_dir=default_model_dir)  # defaults
@@ -46,7 +46,7 @@ class EvalBBNet(nn.Module):
                 self.G = nn.DataParallel(G)
             self.G.eval().requires_grad_(False)
 
-        if type in ['bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
+        if type in ['bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
             self.use_float16 = True
             self.decorator = torch.cuda.amp.autocast()
 
@@ -59,6 +59,14 @@ class EvalBBNet(nn.Module):
                 self.iteration_teacher = DDP(iteration_teacher, device_ids=[rank], output_device=rank, find_unused_parameters=False)
             else:
                 self.iteration_teacher = iteration_teacher.eval() # .cuda()
+
+        if type in ['bbnet_patch_select']:
+            predictor_load_path = teachers.get_load_path(os.path.join(teachers.new_model_dir, 'baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0'), model_checkpoint=-1)
+
+            self.patch_selector = teachers.flow_error_similarity_teacher(
+                model_func=teachers.error_teacher_model_func_with_fa,
+                model_path=predictor_load_path
+            ).requires_grad_(False).cuda()
 
 
     def forward(self, image_1, image_2, ts=None, pos_threshold=0.9, neg_threshold=0.1, save_path=None, num_init_points=None, gt_segment=None, init_dist=None):
@@ -88,13 +96,18 @@ class EvalBBNet(nn.Module):
             target_points = self.G.module.target_points
             del self.G.module.corrs, self.G.module.flow_samples
 
-        if self.type in ['bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
+        if self.type in ['bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
             ## Iteration target
 
             with self.decorator:
                 targets, _, _ = self.iteration_teacher(x.to(torch.float16 if self.use_float16 else torch.float32), init_dist=init_dist, sample_batch_size=None)
+            sampling_distribution = self.iteration_teacher.sampling_distribution
             # targets, _, _ = self.iteration_teacher(x, timestamps=ts, sample_batch_size=10, num_target_points=1)
 
+        if self.type in ['bbnet_patch_select']:
+            with torch.cuda.amp.autocast(enabled=True):
+                pos_mask, neg_mask, targets = self.patch_selector(x.to(torch.float16))
+            sampling_distribution = self.patch_selector.sampling_distribution
 
         if gt_segment is not None:
             assert B == 1
@@ -202,7 +215,7 @@ class EvalBBNet(nn.Module):
 
         targets > self.pos_threshold
 
-        return target_points, targets.detach(), self.iteration_teacher.sampling_distribution
+        return target_points, targets.detach(), sampling_distribution
 
 
 
