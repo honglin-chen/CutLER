@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+import time
 
 class EvalBBNet(nn.Module):
     def __init__(self, distributed, rank, type, pos_threshold, neg_threshold):
@@ -20,7 +20,7 @@ class EvalBBNet(nn.Module):
         self.neg_threshold = neg_threshold
 
         self.type = type
-        assert type in ['bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
+        assert type in ['bbnet_init_dino', 'bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
 
         if type in ['bbnet_old', 'all']:
             phi_2frame = load_predictor(model_dir=default_model_dir)  # defaults
@@ -46,7 +46,7 @@ class EvalBBNet(nn.Module):
                 self.G = nn.DataParallel(G)
             self.G.eval().requires_grad_(False)
 
-        if type in ['bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
+        if type in ['bbnet_init_dino', 'bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
             self.use_float16 = True
             self.decorator = torch.cuda.amp.autocast()
 
@@ -61,11 +61,15 @@ class EvalBBNet(nn.Module):
                 self.iteration_teacher = iteration_teacher.eval() # .cuda()
 
         if type in ['bbnet_patch_select']:
-            predictor_load_path = teachers.get_load_path(os.path.join(teachers.new_model_dir, 'baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0'), model_checkpoint=-1)
-
-            self.patch_selector = teachers.flow_error_similarity_teacher(
+            # predictor_load_path = teachers.get_load_path(os.path.join(teachers.new_model_dir, 'baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0'), model_checkpoint=-1)
+            from functools import partial
+            flow_error_similarity_teacher = partial(
+                teachers.flow_error_similarity_teacher,
+                is_teacher=False)
+            self.patch_selector = flow_error_similarity_teacher(
+                is_teacher=False,
                 model_func=teachers.error_teacher_model_func_with_fa,
-                model_path=predictor_load_path
+                model_path='/ccn2/u/honglinc/dbear/checkpoints/baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0/checkpoint-210.pth'
             ).requires_grad_(False).cuda()
 
 
@@ -96,7 +100,7 @@ class EvalBBNet(nn.Module):
             target_points = self.G.module.target_points
             del self.G.module.corrs, self.G.module.flow_samples
 
-        if self.type in ['bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
+        if self.type in ['bbnet_init_dino', 'bbnet', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all']:
             ## Iteration target
 
             with self.decorator:
@@ -105,8 +109,11 @@ class EvalBBNet(nn.Module):
             # targets, _, _ = self.iteration_teacher(x, timestamps=ts, sample_batch_size=10, num_target_points=1)
 
         if self.type in ['bbnet_patch_select']:
+            start = time.time()
             with torch.cuda.amp.autocast(enabled=True):
                 pos_mask, neg_mask, targets = self.patch_selector(x.to(torch.float16))
+            print('time for patch selection', time.time() - start)
+
             sampling_distribution = self.patch_selector.sampling_distribution
 
         if gt_segment is not None:

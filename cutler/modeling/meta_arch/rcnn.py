@@ -232,7 +232,7 @@ class GeneralizedRCNN(nn.Module):
                 for x in batched_inputs:
                     image = F.interpolate(x['image'].float().to(device).unsqueeze(0), size=224, mode='bilinear')
                     teacher_x.append(image)
-                teacher_x_0 = torch.cat(teacher_x, dim=0).contiguous()
+                teacher_x = teacher_x_0 = torch.cat(teacher_x, dim=0).contiguous()
                 teacher_x_1 = teacher_x_0.clone()
             save_path = None
             # if not os.path.exists(f'/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher'):

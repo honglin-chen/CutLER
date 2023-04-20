@@ -1,6 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # Modified by XuDong Wang from https://github.com/facebookresearch/detectron2/blob/main/detectron2/data/datasets/coco.py
-
+import torch
 import contextlib
 import datetime
 import io
@@ -48,34 +48,47 @@ def load_kinetics_json(json_file, image_root, dataset_name=None, extra_annotatio
         rescale_size=480,
         augmentation_type='center'
     )
+    dataset_list = []
+    data_path_list = [
+        '/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt',
+        # '/ccn2/dataset/Kinetics700/kinetics_700_train_list.txt',
+        # '/ccn2/dataset/Moments/multi_moment_train_list.txt',
+        # '/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/ego4d_train_list_320p_chunked_imu.txt'
+    ]
 
-    dataset_dict = vmae_datasets.ContextAndTargetVideoIMUDataset(
-        root=None,
-        #     setting=os.path.join(os.path.expanduser(home_dir), file_list_dir, 'kinetics_400_val_list.txt'),
-        setting=os.path.join(
-            f'/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt'),
-        step_units='ms',
-        new_step=150,
-        context_target_gap=150,
-        video_ext='mp4',
-        is_color=True,
-        context_length=(num_frames - target_length),
-        target_length=target_length,
-        randomize_interframes=False,
-        transform=transform,
-        temporal_jitter=False,
-        channels_first=False,
-        use_imu=True,
-        imu_duration=2.2,
-        num_frames_imu=400,
-        imu_root='kinetics_dummy',
-        visual_root='/ccn2/u/honglinc/dbear/imu_vis/'
-    )
+    for data_path in data_path_list:
+        dataset_train = vmae_datasets.ContextAndTargetVideoIMUDataset(
+            root=None,
+            #     setting=os.path.join(os.path.expanduser(home_dir), file_list_dir, 'kinetics_400_val_list.txt'),
+            # setting='/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt'),
+            setting=data_path,
+            step_units='ms',
+            new_step=150,
+            context_target_gap=150,
+            video_ext='mp4',
+            is_color=True,
+            context_length=(num_frames - target_length),
+            target_length=target_length,
+            randomize_interframes=False,
+            transform=transform,
+            temporal_jitter=False,
+            channels_first=False,
+            use_imu=True,
+            imu_duration=2.2,
+            num_frames_imu=400,
+            imu_root='kinetics_dummy',
+            visual_root='/ccn2/u/honglinc/dbear/imu_vis/'
+        )
+        # print("adding dataset of len %d" % len(dataset_train))
+        dataset_list.append(dataset_train)
+    dataset_dict = torch.utils.data.ConcatDataset(dataset_list)
 
     if DEBUG:
         self.kinetics_dataset.train = False
         self.kinetics_dataset._start_frame = 100
         logger.warning('For debugging purpose only: hardcoding the start frame of Kinetics to be 100')
+
+    print('Dataset size: %d' % len(dataset_dict))
 
     return dataset_dict
 
