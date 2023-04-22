@@ -37,7 +37,7 @@ MODEL:
 DATASETS:
   TRAIN: ("kinetics_train",)
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 56
   BASE_LR: 0.01
   WEIGHT_DECAY: 0.00005
   STEPS: (80000,)
@@ -60,4 +60,4 @@ TEST:
     ENABLED: True
     NUM_ITER: 200
   DETECTIONS_PER_IMAGE: 100
-OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner_kinetics_fulldata_init_dino/"
+OUTPUT_DIR: "/ccn2/u/honglinc/cutler_checkpoints/bbnet_teacher_background_2corner_kinetics_fulldata_init_dino_bs56/"

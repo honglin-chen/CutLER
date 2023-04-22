@@ -109,10 +109,10 @@ class EvalBBNet(nn.Module):
             # targets, _, _ = self.iteration_teacher(x, timestamps=ts, sample_batch_size=10, num_target_points=1)
 
         if self.type in ['bbnet_patch_select']:
-            start = time.time()
+
             with torch.cuda.amp.autocast(enabled=True):
+                x = x.flip(1) # invest the order of the two frames
                 pos_mask, neg_mask, targets = self.patch_selector(x.to(torch.float16))
-            print('time for patch selection', time.time() - start)
 
             sampling_distribution = self.patch_selector.sampling_distribution
 
