@@ -20,7 +20,7 @@ class EvalBBNet(nn.Module):
         self.neg_threshold = neg_threshold
 
         self.type = type
-        assert type in ['bbnet_init_dino', 'bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
+        assert type in ['bbnet_init_dino', 'bbnet_video', 'bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
 
         if type in ['bbnet_old', 'all']:
             phi_2frame = load_predictor(model_dir=default_model_dir)  # defaults
@@ -72,6 +72,12 @@ class EvalBBNet(nn.Module):
                 model_path='/ccn2/u/honglinc/dbear/checkpoints/baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0/checkpoint-210.pth'
             ).requires_grad_(False).cuda()
 
+        if type in ['bbnet_video']:
+            self.video_teacher = teachers.video_iteration_teacher_with_filter(
+                model_func=teachers.error_teacher_8x8_model_func_with_fa,
+                model_path=teachers.error_teacher_8x8_load_path,
+            ).requires_grad_(False).cuda()
+
 
     def forward(self, image_1, image_2, ts=None, pos_threshold=0.9, neg_threshold=0.1, save_path=None, num_init_points=None, gt_segment=None, init_dist=None):
         B, _, H, W = image_1.shape
@@ -115,6 +121,13 @@ class EvalBBNet(nn.Module):
                 pos_mask, neg_mask, targets = self.patch_selector(x.to(torch.float16))
 
             sampling_distribution = self.patch_selector.sampling_distribution
+
+        if self.type in ['bbnet_video']:
+            with torch.cuda.amp.autocast(enabled=True):
+                targets = self.video_teacher(x.to(torch.float16))
+
+            sampling_distribution = self.video_teacher.sampling_distribution
+
 
         if gt_segment is not None:
             assert B == 1
