@@ -124,7 +124,9 @@ class EvalBBNet(nn.Module):
 
         if self.type in ['bbnet_video']:
             with torch.cuda.amp.autocast(enabled=True):
-                targets = self.video_teacher(x.to(torch.float16))
+                targets = self.video_teacher(x.to(torch.float16),
+                                             num_iters=3,
+                                             init_from_video=True)
 
             sampling_distribution = self.video_teacher.sampling_distribution
 

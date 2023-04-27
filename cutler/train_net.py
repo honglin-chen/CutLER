@@ -129,6 +129,7 @@ def setup(args):
     if args.test_dataset != "": cfg.DATASETS.TEST = ((args.test_dataset),)
     if args.train_dataset != "": cfg.DATASETS.TRAIN = ((args.train_dataset),)
     cfg.TEST.NO_SEGM = args.no_segm
+    cfg.MODEL.DEBUG_ONLY = args.debug_only
     cfg.freeze()
     default_setup(cfg, args)
     return cfg

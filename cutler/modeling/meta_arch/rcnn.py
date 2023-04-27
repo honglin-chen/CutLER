@@ -60,6 +60,7 @@ class GeneralizedRCNN(nn.Module):
         single_mask: Optional[bool] = False,
         downsize_mask: Optional[bool] = False,
         bbnet_teacher_thresh: Optional[float] = 0.75,
+        debug_only: Optional[bool] = False,
     ):
         """
         Args:
@@ -78,6 +79,7 @@ class GeneralizedRCNN(nn.Module):
         self.teacher_type = teacher_type
         self.single_mask = single_mask
         self.downsize_mask = downsize_mask
+        self.debug_only = debug_only
 
         self.input_format = input_format
         self.vis_period = vis_period
@@ -143,6 +145,7 @@ class GeneralizedRCNN(nn.Module):
             "single_mask": cfg.MODEL.SINGLE_MASK,
             "downsize_mask": cfg.MODEL.DOWNSIZE_MASK,
             "bbnet_teacher_thresh": cfg.MODEL.BBNET_TEACHER_THRESH,
+            "debug_only": cfg.MODEL.DEBUG_ONLY,
         }
 
     @property
@@ -213,6 +216,11 @@ class GeneralizedRCNN(nn.Module):
         if not self.training:
             return self.inference(batched_inputs)
 
+        # video bbnet teacher should be supervised on the 2nd frame
+        if 'video' in self.teacher_type:
+            for i in range(len(batched_inputs)):
+                batched_inputs[i]['image'] = batched_inputs[i]['video'][1]
+
         images = self.preprocess_image(batched_inputs)
 
         if 'bbnet' in self.teacher_type: # generate teacher segments on the fly
@@ -220,7 +228,7 @@ class GeneralizedRCNN(nn.Module):
             B, _, H, W = images.tensor.shape
             teacher_x = []
 
-            if 'patch_select' in self.teacher_type:
+            if 'video' in self.teacher_type or 'patch_select' in self.teacher_type:
                 for x in batched_inputs:
                     video = F.interpolate(x['video'].float().to(device), size=224, mode='bilinear').unsqueeze(0)
                     teacher_x.append(video)
@@ -234,11 +242,14 @@ class GeneralizedRCNN(nn.Module):
                     teacher_x.append(image)
                 teacher_x = teacher_x_0 = torch.cat(teacher_x, dim=0).contiguous()
                 teacher_x_1 = teacher_x_0.clone()
-            save_path = None
-            # if not os.path.exists(f'/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher'):
-            #     os.makedirs(f'/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher', exist_ok=True)
-            # save_path = f"/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
-            # save_path = save_path.replace('.mp4', '.png')
+            if self.debug_only:
+                if not os.path.exists(f'/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher'):
+                    os.makedirs(f'/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher', exist_ok=True)
+                save_path = f"/ccn2/u/honglinc/eisen_results_v2/{self.teacher_type}_teacher/{batched_inputs[0]['file_name'].split('/')[-1]}"
+                save_path = save_path.replace('.mp4', '.png')
+            else:
+                save_path = None
+
 
             with torch.no_grad():
 
@@ -285,7 +296,8 @@ class GeneralizedRCNN(nn.Module):
                     instances = utils.annotations_to_instances([annotations], image_size=[H, W], mask_format='bitmask')
 
                     # Visualization
-                    # self.visualize(images, instances, batched_inputs, sampling_distributions, i)
+                    if self.debug_only:
+                        self.visualize(images, instances, batched_inputs, sampling_distributions, i)
                     # End of visualization
 
                 gt_instances.append(instances.to(device))

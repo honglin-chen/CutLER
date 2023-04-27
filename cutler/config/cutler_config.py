@@ -16,6 +16,7 @@ def add_cutler_config(cfg):
     cfg.MODEL.BBNET_TEACHER_THRESH = 0.75
     cfg.MODEL.SINGLE_MASK = False
     cfg.MODEL.DOWNSIZE_MASK = False
+    cfg.MODEL.DEBUG_ONLY = False
 
     cfg.SOLVER.BASE_LR_MULTIPLIER = 1
     cfg.SOLVER.BASE_LR_MULTIPLIER_NAMES = []
