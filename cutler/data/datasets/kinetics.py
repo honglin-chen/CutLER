@@ -50,11 +50,11 @@ def load_kinetics_json(json_file, image_root, dataset_name=None, extra_annotatio
     )
     dataset_list = []
     data_path_list = [
-        #'/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt',
-         '/ccn2/dataset/Kinetics700/kinetics_700_train_list.txt',
-         '/ccn2/dataset/Kinetics700/kinetics_700_test_list.txt',
-         '/ccn2/dataset/Moments/multi_moment_train_list.txt',
-         '/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/ego4d_train_list_320p_chunked_imu.txt'
+        '/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt',
+         # '/ccn2/dataset/Kinetics700/kinetics_700_train_list.txt',
+         # '/ccn2/dataset/Kinetics700/kinetics_700_test_list.txt',
+         # '/ccn2/dataset/Moments/multi_moment_train_list.txt',
+         # '/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/ego4d_train_list_320p_chunked_imu.txt'
     ]
 
     for data_path in data_path_list:

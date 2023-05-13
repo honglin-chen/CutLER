@@ -51,7 +51,7 @@ _PREDEFINED_SPLITS_COCO_CA["coco_cls_agnostic"] = {
 
 _PREDEFINED_SPLITS_KINETICS = {}
 _PREDEFINED_SPLITS_KINETICS["kinetics"] = {
-    "kinetics_train": ("/ccn2/u/datasets/kinetics", "/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt"),
+    "kinetics_train": ("temp", "/home/honglinc/BBNet/bbnet/models/VideoMAE-main/video_file_lists/kinetics_400_train_list.txt"),
 }
 
 _PREDEFINED_SPLITS_IMAGENET = {}

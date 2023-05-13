@@ -32,12 +32,12 @@ MODEL:
   RPN:
     POST_NMS_TOPK_TRAIN: 4000
     NMS_THRESH: 0.65
-  TEACHER_TYPE: "bbnet_video"
-  BBNET_TEACHER_THRESH: 0.6
+  TEACHER_TYPE: "bbnet_video_oit_4x4_non_head"
+  BBNET_TEACHER_THRESH: 0.35
 DATASETS:
   TRAIN: ("kinetics_train",)
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 2
   BASE_LR: 0.01
   WEIGHT_DECAY: 0.00005
   STEPS: (80000,)
@@ -60,4 +60,4 @@ TEST:
     ENABLED: True
     NUM_ITER: 200
   DETECTIONS_PER_IMAGE: 100
-OUTPUT_DIR: "./cutler_checkpoints/bbnet_teacher_background_2corner_fulldata_video_rerun/"
+OUTPUT_DIR: "./cutler_checkpoints/bbnet_video_oit_4x4_non_head_kinetics_400/"

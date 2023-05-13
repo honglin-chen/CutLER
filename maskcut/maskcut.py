@@ -148,6 +148,10 @@ def maskcut_forward(feats, dims, scales, init_image_size, tau=0, N=3, cpu=False)
 
         # unsample the eigenvec
         eigvec = second_smallest_vec.reshape(dims)
+
+        if reverse:
+            eigvec = eigvec * -1
+
         eigvec = torch.from_numpy(eigvec)
         if not cpu: eigvec = eigvec.to('cuda')
         eigvec = F.interpolate(eigvec.unsqueeze(0).unsqueeze(0), size=init_image_size, mode='nearest').squeeze()
@@ -155,8 +159,14 @@ def maskcut_forward(feats, dims, scales, init_image_size, tau=0, N=3, cpu=False)
 
     return seed, bipartitions, eigvecs
 
-def maskcut(img_path, backbone,patch_size, tau, N=1, fixed_size=480, cpu=False) :
-    I = Image.open(img_path).convert('RGB')
+def maskcut(img_path, backbone,patch_size, tau, N=1, fixed_size=480, cpu=False, images=None, get_grid=False):
+
+    if images is not None:
+        I = images.permute(1, 2, 0).cpu().numpy()
+        I = Image.fromarray(np.uint8(I * 255.))
+
+    else:
+        I = Image.open(img_path).convert('RGB')
     bipartitions, eigvecs = [], []
 
     I_new = I.resize((int(fixed_size), int(fixed_size)), PIL.Image.LANCZOS)
@@ -164,14 +174,21 @@ def maskcut(img_path, backbone,patch_size, tau, N=1, fixed_size=480, cpu=False) 
 
     tensor = ToTensor(I_resize).unsqueeze(0)
     if not cpu: tensor = tensor.cuda()
-    feat = backbone(tensor)[0]
+    h = w = fixed_size // patch_size
+
+    if not get_grid:
+
+        feat = backbone(tensor)[0]
+    else:
+
+        feat = backbone.forward_features(tensor)["x_norm_patchtokens"].view(h * w, -1).detach().permute(1, 0)
 
     _, bipartition, eigvec = maskcut_forward(feat, [feat_h, feat_w], [patch_size, patch_size], [h,w], tau, N=N, cpu=cpu)
 
     bipartitions += bipartition
     eigvecs += eigvec
 
-    return bipartitions, eigvecs, I_new
+    return bipartitions, eigvecs, I_new, feat.permute(1, 0).reshape(1, 1, h, w, -1)
 
 def resize_binary_mask(array, new_size):
     image = Image.fromarray(array.astype(np.uint8)*255)

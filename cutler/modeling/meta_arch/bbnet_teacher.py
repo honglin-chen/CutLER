@@ -1,7 +1,14 @@
 import sys
-sys.path.append('/home/honglinc/BBNet')
+import os
+sys.path.append('~/BBNet')
 from bbnet.models.teachers import default_head_motion_eisen_teacher, load_predictor, make_teacher, default_eisen_teacher_func, set_input_shape_parallel, default_model_dir, full_affinities_eisen_teacher_func, iteration_head_motion_eisen_teacher_fa
 import bbnet.models.teachers as teachers
+
+sys.path.append(os.path.expanduser('~/BBNet/bbnet/models/VideoMAE-main/'))
+import modeling_pretrain as vmae_transformers
+import big_models as big_transformers
+
+
 import torch.nn as nn
 import torch
 import os
@@ -10,6 +17,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import time
+from functools import partial
 
 class EvalBBNet(nn.Module):
     def __init__(self, distributed, rank, type, pos_threshold, neg_threshold):
@@ -20,7 +28,7 @@ class EvalBBNet(nn.Module):
         self.neg_threshold = neg_threshold
 
         self.type = type
-        assert type in ['bbnet_init_dino', 'bbnet_video', 'bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
+        # assert type in ['bbnet_init_dino', 'bbnet_video', 'bbnet', 'bbnet_old', 'bbnet_float', 'bbnet_binary', 'bbnet_iter_binary', 'bbnet_iter_binary_gt', 'all', 'bbnet_patch_select'], type
 
         if type in ['bbnet_old', 'all']:
             phi_2frame = load_predictor(model_dir=default_model_dir)  # defaults
@@ -62,7 +70,7 @@ class EvalBBNet(nn.Module):
 
         if type in ['bbnet_patch_select']:
             # predictor_load_path = teachers.get_load_path(os.path.join(teachers.new_model_dir, 'baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0'), model_checkpoint=-1)
-            from functools import partial
+
             flow_error_similarity_teacher = partial(
                 teachers.flow_error_similarity_teacher,
                 is_teacher=False)
@@ -76,6 +84,38 @@ class EvalBBNet(nn.Module):
             self.video_teacher = teachers.video_iteration_teacher_with_filter(
                 model_func=teachers.error_teacher_8x8_model_func_with_fa,
                 model_path=teachers.error_teacher_8x8_load_path,
+            ).requires_grad_(False).cuda()
+
+        if 'bbnet_video_oit' in type:
+            if type == 'bbnet_video_oit_4x4_head': # this is the IMU-conditioned 4x4
+                model_func = big_transformers.imu400_base_4x4patch_2frames_1tube
+                ckpt_path = 'baseHMC4x4_KME_mr099fmp01_IMUfmp01_ctr_bs1024_wu10_tpu0' # the original IMU-conditioned 4x4
+            elif type == 'bbnet_video_oit_4x4_head_few_patch': # this is the IMU-conditioned 4x4
+                model_func = big_transformers.imu400_base_4x4patch_2frames_1tube
+                ckpt_path = 'base2frIMU_4x4_KME_mr09975cf1-2fmp01_ctg50-300_bs512' # the new IMU-conditioned 4x4 with fewer patches
+            elif type == 'bbnet_video_oit_4x4_non_head': # the non-head motion conditioned 4x4
+                model_func = vmae_transformers.base_4x4patch_2frames_1tube
+                ckpt_path = 'base2fr_4x4_KME_mr09975cf1-2_ctg50-300_bs1024_tpu' # the new non-IMU 4x4
+            elif type == 'bbnet_video_oit_4x4_non_head_gpu': # the non-head motion conditioned 4x4
+                model_func = vmae_transformers.base_4x4patch_2frames_1tube
+                ckpt_path = 'base2fr_4x4_KME_mr09975cf1-2_fa_bs768' # trained on gpu
+            elif type == 'bbnet_video_oit_4x4_non_head_large': # the large non-head motion conditioned 4x4
+                model_func = vmae_transformers.large_4x4patch_2frames_1tube
+                ckpt_path = 'large2fr_4x4_KME_mr09975cf1-2_fa_bs224'
+            elif type == 'bbnet_video_oit_8x8_head': # the IMU-conditioned 8x8
+                model_func = vmae_transformers.imu400_padded_8x8patch_2frames_1tube
+                ckpt_path = 'baseHMC8x8_KME_mr099fmp01_IMUfmp01_ctr_bs4096_wu25_ep305lr005x_tpu1' # the original IMU-conditioned 8x8
+
+            if '4x4' in type:
+                teacher_func = teachers.occlusion_iteration_teacher_4x4
+            else:
+                teacher_func = teachers.occlusion_iteration_teacher_8x8
+
+            default_model_dir = '/ccn2/u/honglinc/dbear/checkpoints/'
+            self.OIT = teacher_func(
+                model_func=partial(model_func, use_flash_attention=True),
+                model_path=teachers.get_load_path(os.path.join(default_model_dir, ckpt_path),
+                                                  model_checkpoint=-1)
             ).requires_grad_(False).cuda()
 
 
@@ -130,6 +170,11 @@ class EvalBBNet(nn.Module):
 
             sampling_distribution = self.video_teacher.sampling_distribution
 
+        if 'bbnet_video_oit' in self.type:
+            with torch.cuda.amp.autocast(enabled=True):
+                targets = self.OIT(x.to(torch.float16))[0]
+
+            sampling_distribution = None
 
         if gt_segment is not None:
             assert B == 1
